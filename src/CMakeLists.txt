@@ -67,6 +67,12 @@ add_executable(
   ${CURL_FILES}
   )
 
+if(CURL_STATIC_EXE)
+  target_link_options(
+    ${EXE_NAME} PRIVATE -static
+  )
+endif()
+
 add_executable(
   ${PROJECT_NAME}::${EXE_NAME}
   ALIAS ${EXE_NAME}
