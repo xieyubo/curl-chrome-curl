@@ -156,13 +156,13 @@ CLEANFILES = $(VC10_LIBVCXPROJ) $(VC10_SRCVCXPROJ) $(VC11_LIBVCXPROJ)        \
  $(VC14_SRCVCXPROJ) $(VC14_10_LIBVCXPROJ) $(VC14_10_SRCVCXPROJ)              \
  $(VC14_30_LIBVCXPROJ) $(VC14_30_SRCVCXPROJ)
 
-bin_SCRIPTS = curl-config
+bin_SCRIPTS = curl-impersonate-chrome-config
 
 SUBDIRS = lib src
 DIST_SUBDIRS = $(SUBDIRS) tests packages scripts include docs
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = libcurl.pc
+pkgconfig_DATA = libcurl-impersonate-chrome.pc
 
 # List of files required to generate VC IDE .dsp, .vcproj and .vcxproj files
 include lib/Makefile.inc

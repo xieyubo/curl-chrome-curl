@@ -287,6 +287,13 @@ static const struct LongShort aliases[]= {
   {"EC", "etag-save",                ARG_FILENAME},
   {"ED", "etag-compare",             ARG_FILENAME},
   {"EE", "curves",                   ARG_STRING},
+  {"EG", "signature-hashes",         ARG_STRING},
+  {"EH", "alps",                     ARG_BOOL},
+  {"EI", "cert-compression",         ARG_STRING},
+  {"EJ", "tls-session-ticket",       ARG_BOOL},
+  {"EK", "http2-pseudo-headers-order", ARG_STRING},
+  {"EL", "http2-no-server-push",     ARG_BOOL},
+  {"EM", "tls-permute-extensions",     ARG_BOOL},
   {"f",  "fail",                     ARG_BOOL},
   {"fa", "fail-early",               ARG_BOOL},
   {"fb", "styled-output",            ARG_BOOL},
@@ -1940,6 +1947,39 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
         GetStr(&config->ssl_ec_curves, nextarg);
         break;
 
+      case 'G':
+        /* --signature-hashes */
+        GetStr(&config->ssl_sig_hash_algs, nextarg);
+        break;
+
+      case 'H':
+        /* --alps */
+        config->alps = toggle;
+        break;
+
+      case 'I':
+        /* --cert-compression */
+        GetStr(&config->ssl_cert_compression, nextarg);
+        break;
+
+      case 'J':
+        /* --tls-session-ticket */
+        config->noticket = (!toggle)?TRUE:FALSE;
+        break;
+
+      case 'K':
+        /* --http2-pseudo-headers-order */
+        GetStr(&config->http2_pseudo_headers_order, nextarg);
+        break;
+
+      case 'L':
+        /* --http2-no-server-push */
+        config->http2_no_server_push = toggle;
+        break;
+      case 'M':
+          /* --tls-permute-extensions */
+          config->ssl_permute_extensions = toggle;
+          break;
       default: /* unknown flag */
         return PARAM_OPTION_UNKNOWN;
       }

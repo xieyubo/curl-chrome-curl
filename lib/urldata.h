@@ -277,6 +277,8 @@ struct ssl_primary_config {
   char *password; /* TLS password (for, e.g., SRP) */
 #endif
   char *curves;          /* list of curves to use */
+  char *sig_hash_algs;   /* List of signature hash algorithms to use */
+  char *cert_compression;  /* List of certificate compression algorithms. */
   unsigned char ssl_options;  /* the CURLOPT_SSL_OPTIONS bitmask */
   unsigned int version_max; /* max supported version the client wants to use */
   unsigned char version;    /* what version the client wants to use */
@@ -526,6 +528,9 @@ struct ConnectBits {
   BIT(multiplex); /* connection is multiplexed */
   BIT(tcp_fastopen); /* use TCP Fast Open */
   BIT(tls_enable_alpn); /* TLS ALPN extension? */
+  BIT(tls_enable_alps); /* TLS ALPS extension? */
+  BIT(tls_enable_ticket); /* TLS session ticket extension? */
+  BIT(tls_permute_extensions); /* TLS extension permutations */
 #ifndef CURL_DISABLE_DOH
   BIT(doh);
 #endif
@@ -1395,6 +1400,19 @@ struct UrlState {
   CURLcode hresult; /* used to pass return codes back from hyper callbacks */
 #endif
 
+  /*
+   * curl-impersonate:
+   * List of "base" headers set by CURLOPT_HTTPBASEHEADER.
+   */
+  struct curl_slist *base_headers;
+  /*
+   * curl-impersonate:
+   * Dynamically-constructed list of HTTP headers.
+   * This list is a merge of the default HTTP headers needed to impersonate a
+   * browser, together with any user-supplied headers.
+   */
+  struct curl_slist *merged_headers;
+
   /* Dynamically allocated strings, MUST be freed before this struct is
      killed. */
   struct dynamically_allocated_data {
@@ -1563,6 +1581,9 @@ enum dupstring {
   STRING_DNS_LOCAL_IP6,
   STRING_SSL_EC_CURVES,
   STRING_AWS_SIGV4, /* Parameters for V4 signature */
+  STRING_SSL_SIG_HASH_ALGS,
+  STRING_SSL_CERT_COMPRESSION,
+  STRING_HTTP2_PSEUDO_HEADERS_ORDER,
 
   /* -- end of null-terminated strings -- */
 
@@ -1857,6 +1878,9 @@ struct UserDefined {
   BIT(tcp_keepalive);  /* use TCP keepalives */
   BIT(tcp_fastopen);   /* use TCP Fast Open */
   BIT(ssl_enable_alpn);/* TLS ALPN extension? */
+  BIT(ssl_enable_alps);/* TLS ALPS extension? */
+  BIT(ssl_enable_ticket); /* TLS session ticket extension */
+  BIT(ssl_permute_extensions); /* TLS Permute extensions */
   BIT(path_as_is);     /* allow dotdots? */
   BIT(pipewait);       /* wait for multiplex status before starting a new
                           connection */
@@ -1876,6 +1900,9 @@ struct UserDefined {
   BIT(http09_allowed); /* allow HTTP/0.9 responses */
 #ifdef USE_WEBSOCKETS
   BIT(ws_raw_mode);
+#endif
+#ifdef USE_HTTP2
+  BIT(http2_no_server_push);    /* Disable HTTP2 server push */
 #endif
 };
 

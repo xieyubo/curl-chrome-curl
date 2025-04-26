@@ -73,6 +73,7 @@ struct ssl_connect_data {
   char *hostname;                   /* hostname for verification */
   char *dispname;                   /* display version of hostname */
   const struct alpn_spec *alpn;     /* ALPN to use or NULL for none */
+  const struct alpn_spec *alps;     /* ALPS to use or NULL for none */
   struct ssl_backend_data *backend; /* vtls backend specific props */
   struct cf_call_data call_data;    /* data handle used in current call */
   struct curltime handshake_done;   /* time when handshake finished */

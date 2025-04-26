@@ -50,6 +50,7 @@
 #include "curl_printf.h"
 #include "curl_memory.h"
 #include "memdebug.h"
+#include "rand.h"
 
 #if (NGHTTP2_VERSION_NUM < 0x010c00)
 #error too old nghttp2 version, upgrade!
@@ -68,7 +69,7 @@
  * use 16K as chunk size, as that fits H2 DATA frames well */
 #define H2_CHUNK_SIZE           (16 * 1024)
 /* this is how much we want "in flight" for a stream */
-#define H2_STREAM_WINDOW_SIZE   (10 * 1024 * 1024)
+#define H2_STREAM_WINDOW_SIZE   (1024 * 1024)
 /* on receving from TLS, we prep for holding a full stream window */
 #define H2_NW_RECV_CHUNKS       (H2_STREAM_WINDOW_SIZE / H2_CHUNK_SIZE)
 /* on send into TLS, we just want to accumulate small frames */
@@ -86,24 +87,48 @@
  * will block their received QUOTA in the connection window. And if we
  * run out of space, the server is blocked from sending us any data.
  * See #10988 for an issue with this. */
-#define HTTP2_HUGE_WINDOW_SIZE (100 * H2_STREAM_WINDOW_SIZE)
+/* curl-impersonate: match Chrome window size. */
+#define HTTP2_HUGE_WINDOW_SIZE (15 * H2_STREAM_WINDOW_SIZE)
 
-#define H2_SETTINGS_IV_LEN  3
+#define H2_SETTINGS_IV_LEN  8
 #define H2_BINSETTINGS_LEN 80
 
 static int populate_settings(nghttp2_settings_entry *iv,
                              struct Curl_easy *data)
 {
-  iv[0].settings_id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS;
-  iv[0].value = Curl_multi_max_concurrent_streams(data->multi);
+  int i = 0;
 
-  iv[1].settings_id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE;
-  iv[1].value = H2_STREAM_WINDOW_SIZE;
+  /* curl-impersonate: Align HTTP/2 settings to Chrome's */
+  iv[i].settings_id = NGHTTP2_SETTINGS_HEADER_TABLE_SIZE;
+  iv[i].value = 0x10000;
+  i++;
 
-  iv[2].settings_id = NGHTTP2_SETTINGS_ENABLE_PUSH;
-  iv[2].value = data->multi->push_cb != NULL;
+  if(data->set.http2_no_server_push) {
+    iv[i].settings_id = NGHTTP2_SETTINGS_ENABLE_PUSH;
+    iv[i].value = 0;
+    i++;
+  }
 
-  return 3;
+  iv[i].settings_id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS;
+  iv[i].value = Curl_multi_max_concurrent_streams(data->multi);
+  i++;
+
+  iv[i].settings_id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE;
+  iv[i].value = 0x600000;
+  i++;
+
+  iv[i].settings_id = NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE;
+  iv[i].value = 0x40000;
+  i++;
+  
+  // curl-impersonate:
+  // Up until Chrome 98, there was a randomly chosen setting number in the
+  // HTTP2 SETTINGS frame. This might be something similar to TLS GREASE.
+  // However, it seems to have been removed since.
+  // Curl_rand(data, (unsigned char *)&iv[4].settings_id, sizeof(iv[4].settings_id));
+  // Curl_rand(data, (unsigned char *)&iv[4].value, sizeof(iv[4].value));
+
+  return i;
 }
 
 static size_t populate_binsettings(uint8_t *binsettings,
@@ -1616,11 +1641,17 @@ out:
   return rv;
 }
 
+/*
+ * curl-impersonate: Use Chrome's default HTTP/2 stream weight
+ * instead of NGINX default stream weight.
+ */
+#define CHROME_DEFAULT_STREAM_WEIGHT    (256)
+
 static int sweight_wanted(const struct Curl_easy *data)
 {
   /* 0 weight is not set by user and we take the nghttp2 default one */
   return data->set.priority.weight?
-    data->set.priority.weight : NGHTTP2_DEFAULT_WEIGHT;
+    data->set.priority.weight : CHROME_DEFAULT_STREAM_WEIGHT;
 }
 
 static int sweight_in_effect(const struct Curl_easy *data)
@@ -1642,9 +1673,11 @@ static void h2_pri_spec(struct Curl_easy *data,
   struct Curl_data_priority *prio = &data->set.priority;
   struct stream_ctx *depstream = H2_STREAM_CTX(prio->parent);
   int32_t depstream_id = depstream? depstream->id:0;
+  /* curl-impersonate: Set stream exclusive flag to true. */
+  int exclusive = 1;
   nghttp2_priority_spec_init(pri_spec, depstream_id,
                              sweight_wanted(data),
-                             data->set.priority.exclusive);
+                             exclusive);
   data->state.priority = *prio;
 }
 
@@ -1661,20 +1694,25 @@ static CURLcode h2_progress_egress(struct Curl_cfilter *cf,
   struct stream_ctx *stream = H2_STREAM_CTX(data);
   int rv = 0;
 
-  if((sweight_wanted(data) != sweight_in_effect(data)) ||
-     (data->set.priority.exclusive != data->state.priority.exclusive) ||
-     (data->set.priority.parent != data->state.priority.parent) ) {
+  /* curl-impersonate: Check if stream exclusive flag is true. */
+  if(stream && stream->id > 0 &&
+     ((sweight_wanted(data) != sweight_in_effect(data)) ||
+     (data->set.priority.exclusive != 1) ||
+     (data->set.priority.parent != data->state.priority.parent))) {
     /* send new weight and/or dependency */
     nghttp2_priority_spec pri_spec;
 
     h2_pri_spec(data, &pri_spec);
-    DEBUGF(LOG_CF(data, cf, "[h2sid=%d] Queuing PRIORITY",
-                  stream->id));
-    DEBUGASSERT(stream->id != -1);
-    rv = nghttp2_submit_priority(ctx->h2, NGHTTP2_FLAG_NONE,
-                                 stream->id, &pri_spec);
-    if(rv)
-      goto out;
+    /* curl-impersonate: Don't send PRIORITY frames for main stream. */
+    if(stream->id != 1) {
+      DEBUGF(LOG_CF(data, cf, "[h2sid=%d] Queuing PRIORITY",
+                    stream->id));
+      DEBUGASSERT(stream->id != -1);
+      rv = nghttp2_submit_priority(ctx->h2, NGHTTP2_FLAG_NONE,
+                                   stream->id, &pri_spec);
+      if(rv)
+        goto out;
+    }
   }
 
   while(!rv && nghttp2_session_want_write(ctx->h2))

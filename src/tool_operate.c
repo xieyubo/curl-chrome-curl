@@ -1493,6 +1493,15 @@ static CURLcode single_transfer(struct GlobalConfig *global,
             return result;
           }
 
+          if(config->http2_pseudo_headers_order)
+            my_setopt_str(curl,
+                          CURLOPT_HTTP2_PSEUDO_HEADERS_ORDER,
+                          config->http2_pseudo_headers_order);
+
+          if(config->http2_no_server_push)
+            my_setopt(curl, CURLOPT_HTTP2_NO_SERVER_PUSH,
+                      config->http2_no_server_push ? 1L : 0L);
+
         } /* (proto_http) */
 
         if(proto_ftp)
@@ -1580,6 +1589,14 @@ static CURLcode single_transfer(struct GlobalConfig *global,
 
         if(config->ssl_ec_curves)
           my_setopt_str(curl, CURLOPT_SSL_EC_CURVES, config->ssl_ec_curves);
+
+        if(config->ssl_sig_hash_algs)
+          my_setopt_str(curl, CURLOPT_SSL_SIG_HASH_ALGS,
+                        config->ssl_sig_hash_algs);
+
+        if(config->ssl_cert_compression)
+          my_setopt_str(curl, CURLOPT_SSL_CERT_COMPRESSION,
+                        config->ssl_cert_compression);
 
         if(config->writeout)
           my_setopt_str(curl, CURLOPT_CERTINFO, 1L);
@@ -1914,6 +1931,10 @@ static CURLcode single_transfer(struct GlobalConfig *global,
           my_setopt_str(curl, CURLOPT_PROXY_TLS13_CIPHERS,
                         config->proxy_cipher13_list);
 
+          /* curl-impersonate */
+        if(config->ssl_permute_extensions)
+            my_setopt(curl, CURLOPT_SSL_PERMUTE_EXTENSIONS, 1L);
+
         /* new in libcurl 7.9.2: */
         if(config->disable_epsv)
           /* disable it */
@@ -2121,6 +2142,14 @@ static CURLcode single_transfer(struct GlobalConfig *global,
 
         if(config->noalpn) {
           my_setopt(curl, CURLOPT_SSL_ENABLE_ALPN, 0L);
+        }
+
+        if(config->alps) {
+          my_setopt(curl, CURLOPT_SSL_ENABLE_ALPS, 1L);
+        }
+
+        if (config->noticket) {
+          my_setopt(curl, CURLOPT_SSL_ENABLE_TICKET, 0L);
         }
 
         /* new in 7.40.0, abstract support added in 7.53.0 */

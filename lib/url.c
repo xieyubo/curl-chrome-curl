@@ -444,6 +444,11 @@ CURLcode Curl_close(struct Curl_easy **datap)
   Curl_safefree(data->state.aptr.proxyuser);
   Curl_safefree(data->state.aptr.proxypasswd);
 
+  /* curl-impersonate: Free the list set by CURLOPT_HTTPBASEHEADER. */
+  curl_slist_free_all(data->state.base_headers);
+  /* curl-impersonate: Free the dynamic list of headers. */
+  curl_slist_free_all(data->state.merged_headers);
+
 #ifndef CURL_DISABLE_DOH
   if(data->req.doh) {
     Curl_dyn_free(&data->req.doh->probe[0].serverdoh);
@@ -595,6 +600,7 @@ CURLcode Curl_init_userdefined(struct Curl_easy *data)
   set->tcp_fastopen = FALSE;
   set->tcp_nodelay = TRUE;
   set->ssl_enable_alpn = TRUE;
+  set->ssl_enable_ticket = TRUE;
   set->expect_100_timeout = 1000L; /* Wait for a second by default. */
   set->sep_headers = TRUE; /* separated header lists by default */
   set->buffer_size = READBUFFER_SIZE;
@@ -3584,6 +3590,9 @@ static CURLcode create_conn(struct Curl_easy *data,
   data->set.ssl.primary.cert_blob = data->set.blobs[BLOB_CERT];
   data->set.ssl.primary.ca_info_blob = data->set.blobs[BLOB_CAINFO];
   data->set.ssl.primary.curves = data->set.str[STRING_SSL_EC_CURVES];
+  data->set.ssl.primary.sig_hash_algs = data->set.str[STRING_SSL_SIG_HASH_ALGS];
+  data->set.ssl.primary.cert_compression =
+    data->set.str[STRING_SSL_CERT_COMPRESSION];
 
 #ifndef CURL_DISABLE_PROXY
   data->set.proxy_ssl.primary.CApath = data->set.str[STRING_SSL_CAPATH_PROXY];
@@ -3695,6 +3704,11 @@ static CURLcode create_conn(struct Curl_easy *data,
          (default) */
       if(data->set.ssl_enable_alpn)
         conn->bits.tls_enable_alpn = TRUE;
+
+      /* curl-impersonate: Turn on ALPS if ALPN is enabled and the bit is
+       * enabled. */
+      if(data->set.ssl_enable_alps)
+        conn->bits.tls_enable_alps = TRUE;
     }
 
     if(waitpipe)

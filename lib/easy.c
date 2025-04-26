@@ -73,6 +73,8 @@
 #include "dynbuf.h"
 #include "altsvc.h"
 #include "hsts.h"
+#include "strcase.h"
+#include "impersonate.h"
 
 #include "easy_lock.h"
 
@@ -331,6 +333,134 @@ CURLsslset curl_global_sslset(curl_sslbackend id, const char *name,
 }
 
 /*
+ * curl-impersonate:
+ * Call curl_easy_setopt() with all the needed options as defined in the
+ * 'impersonations' array.
+ * */
+CURLcode curl_easy_impersonate(struct Curl_easy *data, const char *target,
+                               int default_headers)
+{
+  int i;
+  int ret;
+  const struct impersonate_opts *opts = NULL;
+  struct curl_slist *headers = NULL;
+
+  for(opts = impersonations; opts->target != NULL; opts++) {
+    if (strcasecompare(target, opts->target)) {
+      break;
+    }
+  }
+
+  if(opts->target == NULL) {
+    DEBUGF(fprintf(stderr, "Error: unknown impersonation target '%s'\n",
+                   target));
+    return CURLE_BAD_FUNCTION_ARGUMENT;
+  }
+
+  if(opts->httpversion != CURL_HTTP_VERSION_NONE) {
+    ret = curl_easy_setopt(data, CURLOPT_HTTP_VERSION, opts->httpversion);
+    if(ret)
+      return ret;
+  }
+
+  if (opts->ssl_version != CURL_SSLVERSION_DEFAULT) {
+    ret = curl_easy_setopt(data, CURLOPT_SSLVERSION, opts->ssl_version);
+    if(ret)
+      return ret;
+  }
+
+  if(opts->ciphers) {
+    ret = curl_easy_setopt(data, CURLOPT_SSL_CIPHER_LIST, opts->ciphers);
+    if (ret)
+      return ret;
+  }
+
+  if(opts->curves) {
+    ret = curl_easy_setopt(data, CURLOPT_SSL_EC_CURVES, opts->curves);
+    if(ret)
+      return ret;
+  }
+
+  if(opts->sig_hash_algs) {
+    ret = curl_easy_setopt(data, CURLOPT_SSL_SIG_HASH_ALGS,
+                           opts->sig_hash_algs);
+    if(ret)
+      return ret;
+  }
+
+  ret = curl_easy_setopt(data, CURLOPT_SSL_ENABLE_NPN, opts->npn ? 1 : 0);
+  if(ret)
+    return ret;
+
+  ret = curl_easy_setopt(data, CURLOPT_SSL_ENABLE_ALPN, opts->alpn ? 1 : 0);
+  if(ret)
+    return ret;
+
+  ret = curl_easy_setopt(data, CURLOPT_SSL_ENABLE_ALPS, opts->alps ? 1 : 0);
+  if(ret)
+    return ret;
+
+  ret = curl_easy_setopt(data, CURLOPT_SSL_ENABLE_TICKET,
+                         opts->tls_session_ticket ? 1 : 0);
+  if(ret)
+    return ret;
+
+  if(opts->tls_permute_extensions) {
+    ret = curl_easy_setopt(data, CURLOPT_SSL_PERMUTE_EXTENSIONS, 1);
+    if(ret)
+      return ret;
+  }
+
+  if(opts->cert_compression) {
+    ret = curl_easy_setopt(data,
+                           CURLOPT_SSL_CERT_COMPRESSION,
+                           opts->cert_compression);
+    if(ret)
+      return ret;
+  }
+
+  if(default_headers) {
+    /* Build a linked list out of the static array of headers. */
+    for(i = 0; i < IMPERSONATE_MAX_HEADERS; i++) {
+      if(opts->http_headers[i]) {
+        headers = curl_slist_append(headers, opts->http_headers[i]);
+        if(!headers) {
+          return CURLE_OUT_OF_MEMORY;
+        }
+      }
+    }
+
+    if(headers) {
+      ret = curl_easy_setopt(data, CURLOPT_HTTPBASEHEADER, headers);
+      curl_slist_free_all(headers);
+      if(ret)
+        return ret;
+    }
+  }
+
+  if(opts->http2_pseudo_headers_order) {
+    ret = curl_easy_setopt(data,
+                           CURLOPT_HTTP2_PSEUDO_HEADERS_ORDER,
+                           opts->http2_pseudo_headers_order);
+    if(ret)
+      return ret;
+  }
+
+  if(opts->http2_no_server_push) {
+    ret = curl_easy_setopt(data, CURLOPT_HTTP2_NO_SERVER_PUSH, 1L);
+    if(ret)
+      return ret;
+  }
+
+  /* Always enable all supported compressions. */
+  ret = curl_easy_setopt(data, CURLOPT_ACCEPT_ENCODING, "");
+  if(ret)
+    return ret;
+
+  return CURLE_OK;
+}
+
+/*
  * curl_easy_init() is the external interface to alloc, setup and init an
  * easy handle that is returned. If anything goes wrong, NULL is returned.
  */
@@ -338,6 +468,8 @@ struct Curl_easy *curl_easy_init(void)
 {
   CURLcode result;
   struct Curl_easy *data;
+  char *env_target;
+  char *env_headers;
 
   /* Make sure we inited the global SSL stuff */
   global_init_lock();
@@ -358,6 +490,29 @@ struct Curl_easy *curl_easy_init(void)
   if(result) {
     DEBUGF(fprintf(stderr, "Error: Curl_open failed\n"));
     return NULL;
+  }
+
+  /*
+   * curl-impersonate: Hook into curl_easy_init() to set the required options
+   * from an environment variable.
+   * This is a bit hacky but allows seamless integration of libcurl-impersonate
+   * without code modifications to the app.
+   */
+  env_target = curl_getenv("CURL_IMPERSONATE");
+  if(env_target) {
+    env_headers = curl_getenv("CURL_IMPERSONATE_HEADERS");
+    if(env_headers) {
+      result = curl_easy_impersonate(data, env_target,
+                                     !strcasecompare(env_headers, "no"));
+      free(env_headers);
+    } else {
+      result = curl_easy_impersonate(data, env_target, true);
+    }
+    free(env_target);
+    if(result) {
+      Curl_close(&data);
+      return NULL;
+    }
   }
 
   return data;
@@ -930,6 +1085,13 @@ struct Curl_easy *curl_easy_duphandle(struct Curl_easy *data)
     outcurl->state.referer_alloc = TRUE;
   }
 
+  if(data->state.base_headers) {
+    outcurl->state.base_headers =
+      Curl_slist_duplicate(data->state.base_headers);
+    if(!outcurl->state.base_headers)
+      goto fail;
+  }
+
   /* Reinitialize an SSL engine for the new handle
    * note: the engine name has already been copied by dupset */
   if(outcurl->set.str[STRING_SSL_ENGINE]) {
@@ -1019,6 +1181,9 @@ fail:
  */
 void curl_easy_reset(struct Curl_easy *data)
 {
+  char *env_target;
+  char *env_headers;
+
   Curl_free_request_state(data);
 
   /* zero out UserDefined data: */
@@ -1043,6 +1208,23 @@ void curl_easy_reset(struct Curl_easy *data)
 #if !defined(CURL_DISABLE_HTTP) && !defined(CURL_DISABLE_CRYPTO_AUTH)
   Curl_http_auth_cleanup_digest(data);
 #endif
+
+  /*
+   * curl-impersonate: Hook into curl_easy_reset() to set the required options
+   * from an environment variable, just like in curl_easy_init().
+   */
+  env_target = curl_getenv("CURL_IMPERSONATE");
+  if(env_target) {
+    env_headers = curl_getenv("CURL_IMPERSONATE_HEADERS");
+    if(env_headers) {
+      curl_easy_impersonate(data, env_target,
+                            !strcasecompare(env_headers, "no"));
+      free(env_headers);
+    } else {
+      curl_easy_impersonate(data, env_target, true);
+    }
+    free(env_target);
+  }
 }
 
 /*
