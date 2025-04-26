@@ -25,12 +25,29 @@
  ***************************************************************************/
 #include <curl/curlver.h>
 
+#define CURL_STR(X) #X
+#define CURL_STR2(X) CURL_STR(X)
+
+#ifndef CURL_CUSTOM_NAME
 #define CURL_NAME "curl"
+#else
+#define CURL_NAME CURL_STR2(CURL_CUSTOM_NAME)
+#endif
+
 #define CURL_COPYRIGHT LIBCURL_COPYRIGHT
+
+#ifndef CURL_VERSION
 #define CURL_VERSION LIBCURL_VERSION
+#endif
+
 #define CURL_VERSION_MAJOR LIBCURL_VERSION_MAJOR
 #define CURL_VERSION_MINOR LIBCURL_VERSION_MINOR
 #define CURL_VERSION_PATCH LIBCURL_VERSION_PATCH
+
+#ifdef CURL_COMMIT_ID
+#define CURL_ID CURL_NAME " " CURL_VERSION "-" CURL_STR2(CURL_COMMIT_ID) " (" OS ") "
+#else
 #define CURL_ID CURL_NAME " " CURL_VERSION " (" OS ") "
+#endif
 
 #endif /* HEADER_CURL_TOOL_VERSION_H */
