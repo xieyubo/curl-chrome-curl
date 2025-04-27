@@ -227,7 +227,7 @@ static void main_free(struct GlobalConfig *config)
 #endif
 int wmain(int argc, wchar_t *argv[])
 #else
-int main(int argc, char *argv[])
+int tool_main(int argc, char *argv[])
 #endif
 {
   CURLcode result = CURLE_OK;
