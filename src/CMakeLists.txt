@@ -68,7 +68,7 @@ endif()
 
 add_executable(
   ${EXE_NAME}
-  ${CURL_CFILES} ${CURLX_CFILES} ${CURL_HFILES}
+  ${CURL_CFILES} ${CURLX_CFILES} ${CURL_HFILES} dummy.cpp
   )
 
 if(CURL_STATIC_EXE)
