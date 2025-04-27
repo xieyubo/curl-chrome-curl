@@ -113,6 +113,10 @@ libcurl_impersonate_chrome_la_CPPFLAGS = $(AM_CPPFLAGS) $(libcurl_impersonate_ch
 libcurl_impersonate_chrome_la_LDFLAGS = $(AM_LDFLAGS) $(libcurl_impersonate_chrome_la_LDFLAGS_EXTRA) $(LDFLAGS) $(LIBCURL_LIBS)
 libcurl_impersonate_chrome_la_CFLAGS = $(AM_CFLAGS) $(libcurl_impersonate_chrome_la_CFLAGS_EXTRA)
 
+libcurl_la_CPPFLAGS = $(AM_CPPFLAGS) $(libcurl_la_CPPFLAGS_EXTRA)
+libcurl_la_LDFLAGS = $(AM_LDFLAGS) $(libcurl_la_LDFLAGS_EXTRA) $(CURL_LDFLAGS_LIB) $(LIBCURL_LIBS)
+libcurl_la_CFLAGS = $(AM_CFLAGS) $(libcurl_la_CFLAGS_EXTRA)
+
 libcurlu_la_CPPFLAGS = $(AM_CPPFLAGS) -DCURL_STATICLIB -DUNITTESTS
 libcurlu_la_LDFLAGS = $(AM_LDFLAGS) -static $(LIBCURL_LIBS)
 libcurlu_la_CFLAGS = $(AM_CFLAGS)
