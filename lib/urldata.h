@@ -644,7 +644,9 @@ struct SingleRequest {
   curl_off_t pendingheader;      /* this many bytes left to send is actually
                                     header and not body */
   struct curltime start;         /* transfer started at this time */
-  unsigned int headerbytecount;  /* only count received headers */
+  unsigned int headerbytecount;  /* received server headers (not CONNECT
+                                    headers) */
+  unsigned int allheadercount;   /* all received headers (server + CONNECT) */
   unsigned int deductheadercount; /* this amount of bytes doesn't count when
                                      we check if anything has been transferred
                                      at the end of a connection. We use this
@@ -1264,6 +1266,7 @@ struct tempbuf {
   struct dynbuf b;
   int type;   /* type of the 'tempwrite' buffer as a bitmask that is used with
                  Curl_client_write() */
+  BIT(paused_body); /* if PAUSE happened before/during BODY write */
 };
 
 /* Timers */
@@ -1972,7 +1975,7 @@ struct Curl_easy {
      other using the same cache. For easier tracking
      in log output.
      This may wrap around after LONG_MAX to 0 again, so it
-     has no uniqueness guarantuee for very large processings. */
+     has no uniqueness guarantee for very large processings. */
   curl_off_t id;
 
   /* first, two fields for the linked list of these */
@@ -2035,6 +2038,10 @@ struct Curl_easy {
 #ifdef USE_HYPER
   struct hyptransfer hyp;
 #endif
+
+  /* internal: true if this easy handle was created for internal use and the
+     user does not have ownership of the handle. */
+  bool internal;
 };
 
 #define LIBCURL_NAME "libcurl"
