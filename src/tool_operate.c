@@ -1590,10 +1590,6 @@ static CURLcode single_transfer(struct GlobalConfig *global,
         if(config->ssl_ec_curves)
           my_setopt_str(curl, CURLOPT_SSL_EC_CURVES, config->ssl_ec_curves);
 
-        if(config->ssl_sig_hash_algs)
-          my_setopt_str(curl, CURLOPT_SSL_SIG_HASH_ALGS,
-                        config->ssl_sig_hash_algs);
-
         if(config->ssl_cert_compression)
           my_setopt_str(curl, CURLOPT_SSL_CERT_COMPRESSION,
                         config->ssl_cert_compression);

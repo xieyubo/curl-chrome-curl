@@ -381,13 +381,6 @@ CURLcode curl_easy_impersonate(struct Curl_easy *data, const char *target,
       return ret;
   }
 
-  if(opts->sig_hash_algs) {
-    ret = curl_easy_setopt(data, CURLOPT_SSL_SIG_HASH_ALGS,
-                           opts->sig_hash_algs);
-    if(ret)
-      return ret;
-  }
-
   ret = curl_easy_setopt(data, CURLOPT_SSL_ENABLE_NPN, opts->npn ? 1 : 0);
   if(ret)
     return ret;

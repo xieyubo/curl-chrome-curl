@@ -3939,25 +3939,12 @@ static CURLcode ossl_connect_step1(struct Curl_cfilter *cf,
     size_t nalgs;
     /* curl-impersonate: Set the signature algorithms (TLS extension 13).
      * See net/socket/ssl_client_socket_impl.cc in Chromium's source. */
-    char *sig_hash_algs = conn_config->sig_hash_algs;
-    if (sig_hash_algs) {
-      CURLcode result = parse_sig_algs(data, sig_hash_algs, algs, &nalgs);
-      if (result)
-        return result;
-      if (!SSL_CTX_set_verify_algorithm_prefs(backend->ctx, algs, nalgs)) {
-        failf(data, "failed setting signature hash algorithms list: '%s'",
-              sig_hash_algs);
-        return CURLE_SSL_CIPHER;
-      }
-    } else {
-      /* Use defaults from Chrome. */
-      if (!SSL_CTX_set_verify_algorithm_prefs(backend->ctx,
-                                              default_sig_algs,
-                                              DEFAULT_SIG_ALGS_LENGTH)) {
-        failf(data, "failed setting signature hash algorithms list: '%s'",
-              sig_hash_algs);
-        return CURLE_SSL_CIPHER;
-      }
+    /* Use defaults from Chrome. */
+    if (!SSL_CTX_set_verify_algorithm_prefs(backend->ctx,
+                                            default_sig_algs,
+                                            DEFAULT_SIG_ALGS_LENGTH)) {
+      failf(data, "failed setting chrome default signature hash algorithms");
+      return CURLE_SSL_CIPHER;
     }
   }
 #endif

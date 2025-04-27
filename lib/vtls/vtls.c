@@ -196,7 +196,6 @@ Curl_ssl_config_matches(struct ssl_primary_config *data,
      strcasecompare(data->cipher_list, needle->cipher_list) &&
      strcasecompare(data->cipher_list13, needle->cipher_list13) &&
      strcasecompare(data->curves, needle->curves) &&
-     strcasecompare(data->sig_hash_algs, needle->sig_hash_algs) &&
      strcasecompare(data->cert_compression, needle->cert_compression) &&
      strcasecompare(data->CRLfile, needle->CRLfile) &&
      strcasecompare(data->pinned_key, needle->pinned_key))
@@ -228,7 +227,6 @@ Curl_clone_primary_ssl_config(struct ssl_primary_config *source,
   CLONE_STRING(cipher_list13);
   CLONE_STRING(pinned_key);
   CLONE_STRING(curves);
-  CLONE_STRING(sig_hash_algs);
   CLONE_STRING(cert_compression);
   CLONE_STRING(CRLfile);
 #ifdef USE_TLS_SRP
@@ -252,7 +250,6 @@ void Curl_free_primary_ssl_config(struct ssl_primary_config *sslc)
   Curl_safefree(sslc->ca_info_blob);
   Curl_safefree(sslc->issuercert_blob);
   Curl_safefree(sslc->curves);
-  Curl_safefree(sslc->sig_hash_algs);
   Curl_safefree(sslc->cert_compression);
   Curl_safefree(sslc->CRLfile);
 #ifdef USE_TLS_SRP

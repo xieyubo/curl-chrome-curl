@@ -2429,15 +2429,6 @@ CURLcode Curl_vsetopt(struct Curl_easy *data, CURLoption option, va_list param)
                             va_arg(param, char *));
     break;
 
-  case CURLOPT_SSL_SIG_HASH_ALGS:
-    /*
-     * Set the list of hash algorithms we want to use in the SSL connection.
-     * Specify comma-delimited list of algorithms to use.
-     */
-    result = Curl_setstropt(&data->set.str[STRING_SSL_SIG_HASH_ALGS],
-                            va_arg(param, char *));
-    break;
-
   case CURLOPT_SSL_CERT_COMPRESSION:
     /*
      * Set the list of ceritifcate compression algorithms we support in the TLS

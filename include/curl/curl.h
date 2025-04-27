@@ -2211,24 +2211,20 @@ typedef enum {
    * If given, merged with CURLOPT_HTTPHEADER. */
   CURLOPT(CURLOPT_HTTPBASEHEADER, CURLOPTTYPE_SLISTPOINT, 323),
 
-  /* curl-impersonate: A list of TLS signature hash algorithms.
-   * See https://datatracker.ietf.org/doc/html/rfc5246#section-7.4.1.4.1 */
-  CURLOPT(CURLOPT_SSL_SIG_HASH_ALGS, CURLOPTTYPE_STRINGPOINT, 324),
-
   /* curl-impersonate: Whether to enable ALPS in TLS or not.
    * See https://datatracker.ietf.org/doc/html/draft-vvv-tls-alps.
    * Support for ALPS is minimal and is intended only for the TLS client
    * hello to match. */
-  CURLOPT(CURLOPT_SSL_ENABLE_ALPS, CURLOPTTYPE_LONG, 325),
+  CURLOPT(CURLOPT_SSL_ENABLE_ALPS, CURLOPTTYPE_LONG, 324),
 
   /* curl-impersonate: Comma-separated list of certificate compression
    * algorithms to use. These are published in the client hello.
    * Supported algorithms are "zlib" and "brotli".
    * See https://datatracker.ietf.org/doc/html/rfc8879 */
-  CURLOPT(CURLOPT_SSL_CERT_COMPRESSION, CURLOPTTYPE_STRINGPOINT, 326),
+  CURLOPT(CURLOPT_SSL_CERT_COMPRESSION, CURLOPTTYPE_STRINGPOINT, 325),
 
   /* Enable/disable TLS session ticket extension (RFC5077) */
-  CURLOPT(CURLOPT_SSL_ENABLE_TICKET, CURLOPTTYPE_LONG, 327),
+  CURLOPT(CURLOPT_SSL_ENABLE_TICKET, CURLOPTTYPE_LONG, 326),
 
   /*
    * curl-impersonate:
@@ -2237,19 +2233,19 @@ typedef enum {
    * ":method", ":authority", ":scheme", ":path" in the desired order of
    * appearance in the HTTP/2 HEADERS frame.
    */
-  CURLOPT(CURLOPT_HTTP2_PSEUDO_HEADERS_ORDER, CURLOPTTYPE_STRINGPOINT, 328),
+  CURLOPT(CURLOPT_HTTP2_PSEUDO_HEADERS_ORDER, CURLOPTTYPE_STRINGPOINT, 327),
 
   /*
    * curl-impersonate:
    * Disable HTTP2 server push in the HTTP2 SETTINGS.
    */
-  CURLOPT(CURLOPT_HTTP2_NO_SERVER_PUSH, CURLOPTTYPE_LONG, 329),
+  CURLOPT(CURLOPT_HTTP2_NO_SERVER_PUSH, CURLOPTTYPE_LONG, 328),
 
   /* 
    * curl-impersonate: Whether to enable Boringssl permute extensions
    * See https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#SSL_set_permute_extensions.
    */
-  CURLOPT(CURLOPT_SSL_PERMUTE_EXTENSIONS, CURLOPTTYPE_LONG, 330),
+  CURLOPT(CURLOPT_SSL_PERMUTE_EXTENSIONS, CURLOPTTYPE_LONG, 329),
 
   CURLOPT_LASTENTRY /* the last unused */
 } CURLoption;

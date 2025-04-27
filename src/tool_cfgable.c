@@ -173,7 +173,6 @@ static void free_config_fields(struct OperationConfig *config)
   Curl_safefree(config->proto_str);
   Curl_safefree(config->proto_redir_str);
 
-  Curl_safefree(config->ssl_sig_hash_algs);
   Curl_safefree(config->ssl_cert_compression);
   Curl_safefree(config->http2_pseudo_headers_order);
 }

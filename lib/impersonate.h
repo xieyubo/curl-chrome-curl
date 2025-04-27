@@ -14,9 +14,6 @@ struct impersonate_opts {
   /* Elliptic curves (TLS extension 10).
    * Passed to CURLOPT_SSL_EC_CURVES */
   const char *curves;
-  /* Signature hash algorithms (TLS extension 13).
-   * Passed to CURLOPT_SSL_SIG_HASH_ALGS */
-  const char *sig_hash_algs;
   /* Enable TLS NPN extension. */
   bool npn;
   /* Enable TLS ALPN extension. */

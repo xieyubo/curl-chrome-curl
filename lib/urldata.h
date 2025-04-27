@@ -277,7 +277,6 @@ struct ssl_primary_config {
   char *password; /* TLS password (for, e.g., SRP) */
 #endif
   char *curves;          /* list of curves to use */
-  char *sig_hash_algs;   /* List of signature hash algorithms to use */
   char *cert_compression;  /* List of certificate compression algorithms. */
   unsigned char ssl_options;  /* the CURLOPT_SSL_OPTIONS bitmask */
   unsigned int version_max; /* max supported version the client wants to use */
@@ -1581,7 +1580,6 @@ enum dupstring {
   STRING_DNS_LOCAL_IP6,
   STRING_SSL_EC_CURVES,
   STRING_AWS_SIGV4, /* Parameters for V4 signature */
-  STRING_SSL_SIG_HASH_ALGS,
   STRING_SSL_CERT_COMPRESSION,
   STRING_HTTP2_PSEUDO_HEADERS_ORDER,
 
