@@ -175,7 +175,7 @@ curl_headers_msg="enabled (--disable-headers-api)"
     ssl_backends=
      curl_h1_msg="enabled (internal)"
      curl_h2_msg="no      (--with-nghttp2)"
-     curl_h3_msg="no      (--with-ngtcp2 --with-nghttp3, --with-quiche, --with-msh3)"
+     curl_h3_msg="no      (--with-ngtcp2 --with-nghttp3, --with-quiche, --with-openssl-quic, --with-msh3)"
 
 enable_altsvc="yes"
 hsts="yes"
@@ -2059,17 +2059,16 @@ dnl **********************************************************************
 
 AC_ARG_WITH(libpsl,
            AS_HELP_STRING([--without-libpsl],
-           [disable support for libpsl cookie checking]),
+           [disable support for libpsl]),
            with_libpsl=$withval,
            with_libpsl=yes)
+curl_psl_msg="no      (libpsl disabled)"
 if test $with_libpsl != "no"; then
   AC_SEARCH_LIBS(psl_builtin, psl,
     [curl_psl_msg="enabled";
      AC_DEFINE([USE_LIBPSL], [1], [PSL support enabled])
      ],
-    [curl_psl_msg="no      (libpsl not found)";
-     AC_MSG_WARN([libpsl was not found])
-     ]
+    [AC_MSG_ERROR([libpsl was not found]) ]
   )
 fi
 AM_CONDITIONAL([USE_LIBPSL], [test "$curl_psl_msg" = "enabled"])
@@ -2782,6 +2781,11 @@ esac
 
 curl_tcp2_msg="no      (--with-ngtcp2)"
 if test X"$want_tcp2" != Xno; then
+
+  if test "$QUIC_ENABLED" != "yes"; then
+    AC_MSG_ERROR([the detected TLS library does not support QUIC, making --with-ngtcp2 a no-no])
+  fi
+
   dnl backup the pre-ngtcp2 variables
   CLEANLDFLAGS="$LDFLAGS"
   CLEANCPPFLAGS="$CPPFLAGS"
@@ -2837,7 +2841,7 @@ if test X"$want_tcp2" != Xno; then
 
 fi
 
-if test "x$NGTCP2_ENABLED" = "x1" -a "x$OPENSSL_ENABLED" = "x1"; then
+if test "x$NGTCP2_ENABLED" = "x1" -a "x$OPENSSL_ENABLED" = "x1" -a "x$OPENSSL_IS_BORINGSSL" != "x1"; then
   dnl backup the pre-ngtcp2_crypto_quictls variables
   CLEANLDFLAGS="$LDFLAGS"
   CLEANCPPFLAGS="$CPPFLAGS"
@@ -2888,6 +2892,61 @@ if test "x$NGTCP2_ENABLED" = "x1" -a "x$OPENSSL_ENABLED" = "x1"; then
       dnl To avoid link errors, we do not allow --with-ngtcp2 without
       dnl a pkgconfig file
       AC_MSG_ERROR([--with-ngtcp2 was specified but could not find ngtcp2_crypto_quictls pkg-config file.])
+    fi
+  fi
+fi
+
+if test "x$NGTCP2_ENABLED" = "x1" -a "x$OPENSSL_ENABLED" = "x1" -a "x$OPENSSL_IS_BORINGSSL" = "x1"; then
+  dnl backup the pre-ngtcp2_crypto_boringssl variables
+  CLEANLDFLAGS="$LDFLAGS"
+  CLEANCPPFLAGS="$CPPFLAGS"
+  CLEANLIBS="$LIBS"
+
+  CURL_CHECK_PKGCONFIG(libngtcp2_crypto_boringssl, $want_tcp2_path)
+
+  if test "$PKGCONFIG" != "no" ; then
+    LIB_NGTCP2_CRYPTO_BORINGSSL=`CURL_EXPORT_PCDIR([$want_tcp2_path])
+      $PKGCONFIG --libs-only-l libngtcp2_crypto_boringssl`
+    AC_MSG_NOTICE([-l is $LIB_NGTCP2_CRYPTO_BORINGSSL])
+
+    CPP_NGTCP2_CRYPTO_BORINGSSL=`CURL_EXPORT_PCDIR([$want_tcp2_path]) dnl
+      $PKGCONFIG --cflags-only-I libngtcp2_crypto_boringssl`
+    AC_MSG_NOTICE([-I is $CPP_NGTCP2_CRYPTO_BORINGSSL])
+
+    LD_NGTCP2_CRYPTO_BORINGSSL=`CURL_EXPORT_PCDIR([$want_tcp2_path])
+      $PKGCONFIG --libs-only-L libngtcp2_crypto_boringssl`
+    AC_MSG_NOTICE([-L is $LD_NGTCP2_CRYPTO_BORINGSSL])
+
+    LDFLAGS="$LDFLAGS $LD_NGTCP2_CRYPTO_BORINGSSL"
+    CPPFLAGS="$CPPFLAGS $CPP_NGTCP2_CRYPTO_BORINGSSL"
+    LIBS="$LIB_NGTCP2_CRYPTO_BORINGSSL $LIBS"
+
+    if test "x$cross_compiling" != "xyes"; then
+      DIR_NGTCP2_CRYPTO_BORINGSSL=`echo $LD_NGTCP2_CRYPTO_BORINGSSL | $SED -e 's/^-L//'`
+    fi
+    AC_CHECK_LIB(ngtcp2_crypto_boringssl, ngtcp2_crypto_recv_client_initial_cb,
+      [
+       AC_CHECK_HEADERS(ngtcp2/ngtcp2_crypto.h,
+          NGTCP2_ENABLED=1
+          AC_DEFINE(USE_NGTCP2_CRYPTO_BORINGSSL, 1, [if ngtcp2_crypto_boringssl is in use])
+          AC_SUBST(USE_NGTCP2_CRYPTO_BORINGSSL, [1])
+          CURL_LIBRARY_PATH="$CURL_LIBRARY_PATH:$DIR_NGTCP2_CRYPTO_BORINGSSL"
+          export CURL_LIBRARY_PATH
+          AC_MSG_NOTICE([Added $DIR_NGTCP2_CRYPTO_BORINGSSL to CURL_LIBRARY_PATH])
+       )
+      ],
+        dnl not found, revert back to clean variables
+        LDFLAGS=$CLEANLDFLAGS
+        CPPFLAGS=$CLEANCPPFLAGS
+        LIBS=$CLEANLIBS
+    )
+
+  else
+    dnl no ngtcp2_crypto_boringssl pkg-config found, deal with it
+    if test X"$want_tcp2" != Xdefault; then
+      dnl To avoid link errors, we do not allow --with-ngtcp2 without
+      dnl a pkgconfig file
+      AC_MSG_ERROR([--with-ngtcp2 was specified but could not find ngtcp2_crypto_boringssl pkg-config file.])
     fi
   fi
 fi
@@ -3003,13 +3062,52 @@ if test "x$NGTCP2_ENABLED" = "x1" -a "x$WOLFSSL_ENABLED" = "x1"; then
 fi
 
 dnl **********************************************************************
+dnl Check for OpenSSL QUIC
+dnl **********************************************************************
+
+OPT_OPENSSL_QUIC="no"
+
+if test "x$disable_http" = "xyes" -o "x$OPENSSL_ENABLED" != "x1"; then
+  # without HTTP or without openssl, no use
+  OPT_OPENSSL_QUIC="no"
+fi
+
+AC_ARG_WITH(openssl-quic,
+AS_HELP_STRING([--with-openssl-quic],[Enable OpenSSL QUIC usage])
+AS_HELP_STRING([--without-openssl-quic],[Disable OpenSSL QUIC usage]),
+  [OPT_OPENSSL_QUIC=$withval])
+case "$OPT_OPENSSL_QUIC" in
+  no)
+    dnl --without-openssl-quic option used
+    want_openssl_quic="no"
+    ;;
+  yes)
+    dnl --with-openssl-quic option used
+    want_openssl_quic="yes"
+    ;;
+esac
+
+curl_openssl_quic_msg="no      (--with-openssl-quic)"
+if test "x$want_openssl_quic" = "xyes"; then
+
+  if test "$NGTCP2_ENABLED" = 1; then
+    AC_MSG_ERROR([--with-openssl-quic and --with-ngtcp2 are mutually exclusive])
+  fi
+  if test "$HAVE_OPENSSL_QUIC" != 1; then
+    AC_MSG_ERROR([--with-openssl-quic requires quic support in OpenSSL])
+  fi
+  AC_DEFINE(USE_OPENSSL_QUIC, 1, [if openssl QUIC is in use])
+  AC_SUBST(USE_OPENSSL_QUIC, [1])
+fi
+
+dnl **********************************************************************
 dnl Check for nghttp3 (HTTP/3 with ngtcp2)
 dnl **********************************************************************
 
 OPT_NGHTTP3="yes"
 
-if test "x$NGTCP2_ENABLED" = "x"; then
-  # without ngtcp2, nghttp3 is of no use for us
+if test "x$USE_NGTCP2" = "x" -a "$USE_OPENSSL_QUIC" = "x"; then
+  # without ngtcp2 or openssl quic, nghttp3 is of no use for us
   OPT_NGHTTP3="no"
 fi
 
@@ -3036,6 +3134,7 @@ esac
 
 curl_http3_msg="no      (--with-nghttp3)"
 if test X"$want_nghttp3" != Xno; then
+
   dnl backup the pre-nghttp3 variables
   CLEANLDFLAGS="$LDFLAGS"
   CLEANCPPFLAGS="$CPPFLAGS"
@@ -3066,8 +3165,6 @@ if test X"$want_nghttp3" != Xno; then
     AC_CHECK_LIB(nghttp3, nghttp3_conn_client_new_versioned,
       [
        AC_CHECK_HEADERS(nghttp3/nghttp3.h,
-          curl_h3_msg="enabled (ngtcp2 + nghttp3)"
-          NGHTTP3_ENABLED=1
           AC_DEFINE(USE_NGHTTP3, 1, [if nghttp3 is in use])
           AC_SUBST(USE_NGHTTP3, [1])
           CURL_LIBRARY_PATH="$CURL_LIBRARY_PATH:$DIR_NGHTTP3"
@@ -3090,6 +3187,29 @@ if test X"$want_nghttp3" != Xno; then
     fi
   fi
 
+fi
+
+dnl **********************************************************************
+dnl Check for ngtcp2 and nghttp3 (HTTP/3 with ngtcp2 + nghttp3)
+dnl **********************************************************************
+
+if test "x$NGTCP2_ENABLED" = "x1" -a "x$USE_NGHTTP3" = "x1"; then
+  AC_DEFINE(USE_NGTCP2_H3, 1, [if ngtcp2 + nghttp3 is in use])
+  AC_SUBST(USE_NGTCP2_H3, [1])
+  AC_MSG_NOTICE([HTTP3 support is experimental])
+  curl_h3_msg="enabled (ngtcp2 + nghttp3)"
+fi
+
+dnl **********************************************************************
+dnl Check for OpenSSL and nghttp3 (HTTP/3 with nghttp3 using OpenSSL QUIC)
+dnl **********************************************************************
+
+if test "x$USE_OPENSSL_QUIC" = "x1" -a "x$USE_NGHTTP3" = "x1"; then
+  experimental="$experimental HTTP3"
+  AC_DEFINE(USE_OPENSSL_H3, 1, [if openssl quic + nghttp3 is in use])
+  AC_SUBST(USE_OPENSSL_H3, [1])
+  AC_MSG_NOTICE([HTTP3 support is experimental])
+  curl_h3_msg="enabled (openssl + nghttp3)"
 fi
 
 dnl **********************************************************************
@@ -3125,6 +3245,10 @@ case "$OPT_QUICHE" in
 esac
 
 if test X"$want_quiche" != Xno; then
+
+  if test "$QUIC_ENABLED" != "yes"; then
+    AC_MSG_ERROR([the detected TLS library does not support QUIC, making --with-quiche a no-no])
+  fi
 
   if test "$NGHTTP3_ENABLED" = 1; then
     AC_MSG_ERROR([--with-quiche and --with-ngtcp2 are mutually exclusive])
@@ -3224,8 +3348,21 @@ esac
 
 if test X"$want_msh3" != Xno; then
 
+  dnl msh3 on non-Windows needs an OpenSSL with the QUIC API
+  if test "$curl_cv_native_windows" != "yes"; then
+    if test "$QUIC_ENABLED" != "yes"; then
+      AC_MSG_ERROR([the detected TLS library does not support QUIC, making --with-msh3 a no-no])
+    fi
+    if test "$OPENSSL_ENABLED" != "1"; then
+      AC_MSG_ERROR([msh3 requires OpenSSL])
+    fi
+  fi
+
   if test "$NGHTTP3_ENABLED" = 1; then
     AC_MSG_ERROR([--with-msh3 and --with-ngtcp2 are mutually exclusive])
+  fi
+  if test "$QUICHE_ENABLED" = 1; then
+    AC_MSG_ERROR([--with-msh3 and --with-quiche are mutually exclusive])
   fi
 
   dnl backup the pre-msh3 variables
@@ -4557,8 +4694,11 @@ if test "x$USE_NGHTTP2" = "x1"; then
   SUPPORT_FEATURES="$SUPPORT_FEATURES HTTP2"
 fi
 
-if test "x$USE_NGTCP2" = "x1" -o "x$USE_QUICHE" = "x1" \
-    -o "x$USE_MSH3" = "x1"; then
+if test "x$USE_NGTCP2_H3" = "x1" -o "x$USE_QUICHE" = "x1" \
+    -o "x$USE_OPENSSL_H3" = "x1" -o "x$USE_MSH3" = "x1"; then
+  if test "x$CURL_WITH_MULTI_SSL" = "x1"; then
+    AC_MSG_ERROR([MultiSSL cannot be enabled with HTTP/3 and vice versa])
+  fi
   SUPPORT_FEATURES="$SUPPORT_FEATURES HTTP3"
 fi
 

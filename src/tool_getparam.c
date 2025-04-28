@@ -1155,6 +1155,66 @@ static ParameterError set_data(cmdline_t cmd,
   return err;
 }
 
+static ParameterError set_rate(struct GlobalConfig *global,
+                               char *nextarg)
+{
+  /* --rate */
+  /* support a few different suffixes, extract the suffix first, then
+     get the number and convert to per hour.
+     /s == per second
+     /m == per minute
+     /h == per hour (default)
+     /d == per day (24 hours)
+  */
+  ParameterError err = PARAM_OK;
+  char *div = strchr(nextarg, '/');
+  char number[26];
+  long denominator;
+  long numerator = 60*60*1000; /* default per hour */
+  size_t numlen = div ? (size_t)(div - nextarg) : strlen(nextarg);
+  if(numlen > sizeof(number) -1)
+    return PARAM_NUMBER_TOO_LARGE;
+
+  strncpy(number, nextarg, numlen);
+  number[numlen] = 0;
+  err = str2unum(&denominator, number);
+  if(err)
+    return err;
+
+  if(denominator < 1)
+    return PARAM_BAD_USE;
+
+  if(div) {
+    char unit = div[1];
+    switch(unit) {
+    case 's': /* per second */
+      numerator = 1000;
+      break;
+    case 'm': /* per minute */
+      numerator = 60*1000;
+      break;
+    case 'h': /* per hour */
+      break;
+    case 'd': /* per day */
+      numerator = 24*60*60*1000;
+      break;
+    default:
+      errorf(global, "unsupported --rate unit");
+      err = PARAM_BAD_USE;
+      break;
+    }
+  }
+
+  if(err)
+    ;
+  else if(denominator > numerator)
+    err = PARAM_NUMBER_TOO_LARGE;
+  else
+    global->ms_per_transfer = numerator/denominator;
+
+  return err;
+}
+
 
 ParameterError getparameter(const char *flag, /* f or -long-flag */
                             char *nextarg,    /* NULL if unset */
@@ -1392,81 +1452,24 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
         config->sendpersecond = value;
       }
       break;
-    case C_RATE: { /* --rate */
-      /* support a few different suffixes, extract the suffix first, then
-         get the number and convert to per hour.
-         /s == per second
-         /m == per minute
-         /h == per hour (default)
-         /d == per day (24 hours)
-      */
-      char *div = strchr(nextarg, '/');
-      char number[26];
-      long denominator;
-      long numerator = 60*60*1000; /* default per hour */
-      size_t numlen = div ? (size_t)(div - nextarg) : strlen(nextarg);
-      if(numlen > sizeof(number)-1) {
-        err = PARAM_NUMBER_TOO_LARGE;
-        break;
-      }
-      strncpy(number, nextarg, numlen);
-      number[numlen] = 0;
-      err = str2unum(&denominator, number);
-      if(err)
-        break;
-
-      if(denominator < 1) {
-        err = PARAM_BAD_USE;
-        break;
-      }
-      if(div) {
-        char unit = div[1];
-        switch(unit) {
-        case 's': /* per second */
-          numerator = 1000;
-          break;
-        case 'm': /* per minute */
-          numerator = 60*1000;
-          break;
-        case 'h': /* per hour */
-          break;
-        case 'd': /* per day */
-          numerator = 24*60*60*1000;
-          break;
-        default:
-          errorf(global, "unsupported --rate unit");
-          err = PARAM_BAD_USE;
-          break;
-        }
-      }
-
-      if(err)
-        ;
-      else if(denominator > numerator)
-        err = PARAM_NUMBER_TOO_LARGE;
-      else
-        global->ms_per_transfer = numerator/denominator;
-    }
+    case C_RATE:
+      err = set_rate(global, nextarg);
       break;
-
     case C_COMPRESSED: /* --compressed */
       if(toggle && !(feature_libz || feature_brotli || feature_zstd))
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
       else
         config->encoding = toggle;
       break;
-
     case C_TR_ENCODING: /* --tr-encoding */
       config->tr_encoding = toggle;
       break;
-
     case C_DIGEST: /* --digest */
       if(toggle)
         config->authtype |= CURLAUTH_DIGEST;
       else
         config->authtype &= ~CURLAUTH_DIGEST;
       break;
-
     case C_NEGOTIATE: /* --negotiate */
       if(!toggle)
         config->authtype &= ~CURLAUTH_NEGOTIATE;
@@ -1475,7 +1478,6 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
       else
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
       break;
-
     case C_NTLM: /* --ntlm */
       if(!toggle)
         config->authtype &= ~CURLAUTH_NTLM;
@@ -1484,7 +1486,6 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
       else
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
       break;
-
     case C_NTLM_WB: /* --ntlm-wb */
       if(!toggle)
         config->authtype &= ~CURLAUTH_NTLM_WB;
@@ -1493,20 +1494,17 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
       else
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
       break;
-
     case C_BASIC: /* --basic */
       if(toggle)
         config->authtype |= CURLAUTH_BASIC;
       else
         config->authtype &= ~CURLAUTH_BASIC;
       break;
-
     case C_ANYAUTH: /* --anyauth */
       if(toggle)
         config->authtype = CURLAUTH_ANY;
       /* --no-anyauth simply doesn't touch it */
       break;
-
 #ifdef USE_WATT32
     case C_WDEBUG: /* --wdebug */
       dbug_init();
@@ -1515,15 +1513,12 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
     case C_FTP_CREATE_DIRS: /* --ftp-create-dirs */
       config->ftp_create_dirs = toggle;
       break;
-
     case C_CREATE_DIRS: /* --create-dirs */
       config->create_dirs = toggle;
       break;
-
     case C_CREATE_FILE_MODE: /* --create-file-mode */
       err = oct2nummax(&config->create_file_mode, nextarg, 0777);
       break;
-
     case C_MAX_REDIRS: /* --max-redirs */
       /* specified max no of redirects (http(s)), this accepts -1 as a
          special condition */
@@ -1531,28 +1526,23 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
       if(!err && (config->maxredirs < -1))
         err = PARAM_BAD_NUMERIC;
       break;
-
     case C_IPFS_GATEWAY: /* --ipfs-gateway */
       err = getstr(&config->ipfs_gateway, nextarg, DENY_BLANK);
       break;
-
     case C_PROXY_NTLM: /* --proxy-ntlm */
       if(!feature_ntlm)
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
       else
         config->proxyntlm = toggle;
       break;
-
     case C_CRLF: /* --crlf */
       /* LF -> CRLF conversion? */
       config->crlf = toggle;
       break;
-
     case C_AWS_SIGV4: /* --aws-sigv4 */
       config->authtype |= CURLAUTH_AWS_SIGV4;
       err = getstr(&config->aws_sigv4, nextarg, DENY_BLANK);
       break;
-
     case C_STDERR: /* --stderr */
       tool_set_stderr_file(global, nextarg);
       break;
@@ -1615,7 +1605,6 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
         url->flags |= GETOUT_URL;
       }
       break;
-
     case C_SSL: /* --ssl */
       if(toggle && !feature_ssl)
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
@@ -1671,20 +1660,17 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
     case C_RETRY_ALL_ERRORS: /* --retry-all-errors */
       config->retry_all_errors = toggle;
       break;
-
     case C_PROXY_NEGOTIATE: /* --proxy-negotiate */
       if(!feature_spnego)
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
       else
         config->proxynegotiate = toggle;
       break;
-
     case C_FORM_ESCAPE: /* --form-escape */
       config->mime_options &= ~CURLMIMEOPT_FORMESCAPE;
       if(toggle)
         config->mime_options |= CURLMIMEOPT_FORMESCAPE;
       break;
-
     case C_FTP_ACCOUNT: /* --ftp-account */
       err = getstr(&config->ftp_account, nextarg, DENY_BLANK);
       break;
@@ -2014,16 +2000,15 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
         err = getstr(&config->hsts, nextarg, ALLOW_BLANK);
       break;
     case C_COOKIE: /* --cookie */
-      if(nextarg[0] == '@') {
-        nextarg++;
-      }
-      else if(strchr(nextarg, '=')) {
+      if(strchr(nextarg, '=')) {
         /* A cookie string must have a =-letter */
         err = add2list(&config->cookies, nextarg);
         break;
       }
-      /* We have a cookie file to read from! */
-      err = add2list(&config->cookiefiles, nextarg);
+      else {
+        /* We have a cookie file to read from! */
+        err = add2list(&config->cookiefiles, nextarg);
+      }
       break;
     case C_USE_ASCII: /* --use-ascii */
       config->use_ascii = toggle;
