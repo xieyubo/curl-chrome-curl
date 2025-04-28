@@ -1021,7 +1021,8 @@ static const struct LongShort *single(char letter)
 {
   static const struct LongShort *singles[128 - ' ']; /* ASCII => pointer */
   static bool singles_done = FALSE;
-  DEBUGASSERT((letter < 127) && (letter > ' '));
+  if((letter >= 127) || (letter <= ' '))
+    return NULL;
 
   if(!singles_done) {
     unsigned int j;
@@ -1605,6 +1606,7 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
         url->flags |= GETOUT_URL;
       }
       break;
+    case C_FTP_SSL: /* --ftp-ssl */
     case C_SSL: /* --ssl */
       if(toggle && !feature_ssl)
         err = PARAM_LIBCURL_DOESNT_SUPPORT;
@@ -1612,7 +1614,8 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
         config->ftp_ssl = toggle;
         if(config->ftp_ssl)
           warnf(global,
-                "--ssl is an insecure option, consider --ssl-reqd instead");
+                "--%s is an insecure option, consider --ssl-reqd instead",
+                a->lname);
       }
       break;
     case C_FTP_PASV: /* --ftp-pasv */
@@ -2685,7 +2688,7 @@ ParameterError getparameter(const char *flag, /* f or -long-flag */
           warnf(global, "Failed to read %s", fname);
       }
       else
-        err = getstr(&config->writeout, nextarg, DENY_BLANK);
+        err = getstr(&config->writeout, nextarg, ALLOW_BLANK);
       break;
     case C_PREPROXY: /* --preproxy */
       err = getstr(&config->preproxy, nextarg, DENY_BLANK);
