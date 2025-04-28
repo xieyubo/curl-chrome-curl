@@ -631,6 +631,7 @@ typedef enum {
   CURLE_PROXY,                   /* 97 - proxy handshake error */
   CURLE_SSL_CLIENTCERT,          /* 98 - client-side certificate required */
   CURLE_UNRECOVERABLE_POLL,      /* 99 - poll/select returned fatal error */
+  CURLE_TOO_LARGE,               /* 100 - a value/data met its maximum */
   CURL_LAST /* never use! */
 } CURLcode;
 
@@ -2201,24 +2202,27 @@ typedef enum {
   /* set a specific client IP for HAProxy PROXY protocol header? */
   CURLOPT(CURLOPT_HAPROXY_CLIENT_IP, CURLOPTTYPE_STRINGPOINT, 323),
 
+  /* millisecond version */
+  CURLOPT(CURLOPT_SERVER_RESPONSE_TIMEOUT_MS, CURLOPTTYPE_LONG, 324),
+
   /* curl-impersonate: A list of headers used by the impersonated browser.
    * If given, merged with CURLOPT_HTTPHEADER. */
-  CURLOPT(CURLOPT_HTTPBASEHEADER, CURLOPTTYPE_SLISTPOINT, 324),
+  CURLOPT(CURLOPT_HTTPBASEHEADER, CURLOPTTYPE_SLISTPOINT, 325),
 
   /* curl-impersonate: Whether to enable ALPS in TLS or not.
    * See https://datatracker.ietf.org/doc/html/draft-vvv-tls-alps.
    * Support for ALPS is minimal and is intended only for the TLS client
    * hello to match. */
-  CURLOPT(CURLOPT_SSL_ENABLE_ALPS, CURLOPTTYPE_LONG, 325),
+  CURLOPT(CURLOPT_SSL_ENABLE_ALPS, CURLOPTTYPE_LONG, 326),
 
   /* curl-impersonate: Comma-separated list of certificate compression
    * algorithms to use. These are published in the client hello.
    * Supported algorithms are "zlib" and "brotli".
    * See https://datatracker.ietf.org/doc/html/rfc8879 */
-  CURLOPT(CURLOPT_SSL_CERT_COMPRESSION, CURLOPTTYPE_STRINGPOINT, 326),
+  CURLOPT(CURLOPT_SSL_CERT_COMPRESSION, CURLOPTTYPE_STRINGPOINT, 327),
 
   /* Enable/disable TLS session ticket extension (RFC5077) */
-  CURLOPT(CURLOPT_SSL_ENABLE_TICKET, CURLOPTTYPE_LONG, 327),
+  CURLOPT(CURLOPT_SSL_ENABLE_TICKET, CURLOPTTYPE_LONG, 328),
 
   /*
    * curl-impersonate:
@@ -2227,19 +2231,19 @@ typedef enum {
    * ":method", ":authority", ":scheme", ":path" in the desired order of
    * appearance in the HTTP/2 HEADERS frame.
    */
-  CURLOPT(CURLOPT_HTTP2_PSEUDO_HEADERS_ORDER, CURLOPTTYPE_STRINGPOINT, 328),
+  CURLOPT(CURLOPT_HTTP2_PSEUDO_HEADERS_ORDER, CURLOPTTYPE_STRINGPOINT, 329),
 
   /*
    * curl-impersonate:
    * Disable HTTP2 server push in the HTTP2 SETTINGS.
    */
-  CURLOPT(CURLOPT_HTTP2_NO_SERVER_PUSH, CURLOPTTYPE_LONG, 329),
+  CURLOPT(CURLOPT_HTTP2_NO_SERVER_PUSH, CURLOPTTYPE_LONG, 330),
 
   /* 
    * curl-impersonate: Whether to enable Boringssl permute extensions
    * See https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#SSL_set_permute_extensions.
    */
-  CURLOPT(CURLOPT_SSL_PERMUTE_EXTENSIONS, CURLOPTTYPE_LONG, 330),
+  CURLOPT(CURLOPT_SSL_PERMUTE_EXTENSIONS, CURLOPTTYPE_LONG, 331),
 
   CURLOPT_LASTENTRY /* the last unused */
 } CURLoption;
@@ -2972,7 +2976,8 @@ typedef enum {
   CURLINFO_CAPATH           = CURLINFO_STRING + 62,
   CURLINFO_XFER_ID          = CURLINFO_OFF_T + 63,
   CURLINFO_CONN_ID          = CURLINFO_OFF_T + 64,
-  CURLINFO_LASTONE          = 64
+  CURLINFO_QUEUE_TIME_T     = CURLINFO_OFF_T + 65,
+  CURLINFO_LASTONE          = 65
 } CURLINFO;
 
 /* CURLINFO_RESPONSE_CODE is the new name for the option previously known as
