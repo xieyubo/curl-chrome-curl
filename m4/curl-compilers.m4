@@ -521,7 +521,7 @@ AC_DEFUN([CURL_COMPILER_WORKS_IFELSE], [
         #endif
       ]],[[
         int i = 0;
-        exit(i);
+        return i;
       ]])
     ],[
       tmp_compiler_works="yes"
@@ -871,6 +871,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
           # CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [switch-enum])      # Not used because this basically disallows default case
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [type-limits])
           # CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [unused-macros])    # Not practical
+          # tmp_CFLAGS="$tmp_CFLAGS -Wno-error=unused-macros"
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [unreachable-code unused-parameter])
           fi
           #
@@ -889,6 +890,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
           #
           dnl Only clang 3.0 or later
           if test "$compiler_num" -ge "300"; then
+            CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [cast-qual])
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [language-extension-token])
             tmp_CFLAGS="$tmp_CFLAGS -Wformat=2"
           fi
@@ -1034,6 +1036,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
           #
           dnl Only gcc 4.0 or later
           if test "$compiler_num" -ge "400"; then
+            CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [cast-qual])
             tmp_CFLAGS="$tmp_CFLAGS -Wstrict-aliasing=3"
           fi
           #
@@ -1055,6 +1058,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
             CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [redundant-decls])
           # CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [switch-enum])      # Not used because this basically disallows default case
           # CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [unused-macros])    # Not practical
+          # tmp_CFLAGS="$tmp_CFLAGS -Wno-error=unused-macros"
           fi
           #
           dnl Only gcc 4.2 or later
@@ -1077,6 +1081,7 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
           #
           dnl Only gcc 4.5 or later
           if test "$compiler_num" -ge "405"; then
+            CURL_ADD_COMPILER_WARNINGS([tmp_CFLAGS], [jump-misses-init])
             dnl Only Windows targets
             if test "$curl_cv_native_windows" = "yes"; then
               tmp_CFLAGS="$tmp_CFLAGS -Wno-pedantic-ms-format"
@@ -1166,6 +1171,10 @@ AC_DEFUN([CURL_SET_COMPILER_WARNING_OPTS], [
         if test "$compiler_num" -ge "403" -a "$compiler_num" -lt "408"; then
           dnl Avoid false positives
           tmp_CFLAGS="$tmp_CFLAGS -Wno-type-limits"
+        fi
+        if test "$compiler_num" -ge "501" -a "$compiler_num" -lt "505"; then
+          dnl Avoid false positives
+          tmp_CFLAGS="$tmp_CFLAGS -Wno-conversion"
         fi
         ;;
         #
@@ -1347,9 +1356,10 @@ AC_DEFUN([CURL_CHECK_COMPILER_ARRAY_SIZE_NEGATIVE], [
   AC_MSG_CHECKING([if compiler halts on negative sized arrays])
   AC_COMPILE_IFELSE([
     AC_LANG_PROGRAM([[
-      typedef char bad_t[sizeof(char) == sizeof(int) ? -1 : -1 ];
+      typedef char bad_t[sizeof(char) == sizeof(int) ? -1 : -1];
     ]],[[
       bad_t dummy;
+      (void)dummy;
     ]])
   ],[
     AC_MSG_RESULT([no])
@@ -1379,11 +1389,13 @@ AC_DEFUN([CURL_CHECK_COMPILER_STRUCT_MEMBER_SIZE], [
         struct mystruct *next;
       };
       struct mystruct myfunc();
-      typedef char good_t1[sizeof(myfunc().mi) == sizeof(int)  ? 1 : -1 ];
-      typedef char good_t2[sizeof(myfunc().mc) == sizeof(char) ? 1 : -1 ];
+      typedef char good_t1[sizeof(myfunc().mi) == sizeof(int)  ? 1 : -1];
+      typedef char good_t2[sizeof(myfunc().mc) == sizeof(char) ? 1 : -1];
     ]],[[
       good_t1 dummy1;
       good_t2 dummy2;
+      (void)dummy1;
+      (void)dummy2;
     ]])
   ],[
     tst_compiler_check_one_works="yes"
@@ -1401,11 +1413,13 @@ AC_DEFUN([CURL_CHECK_COMPILER_STRUCT_MEMBER_SIZE], [
         struct mystruct *next;
       };
       struct mystruct myfunc();
-      typedef char bad_t1[sizeof(myfunc().mi) != sizeof(int)  ? 1 : -1 ];
-      typedef char bad_t2[sizeof(myfunc().mc) != sizeof(char) ? 1 : -1 ];
+      typedef char bad_t1[sizeof(myfunc().mi) != sizeof(int)  ? 1 : -1];
+      typedef char bad_t2[sizeof(myfunc().mc) != sizeof(char) ? 1 : -1];
     ]],[[
       bad_t1 dummy1;
       bad_t2 dummy2;
+      (void)dummy1;
+      (void)dummy2;
     ]])
   ],[
     tst_compiler_check_two_works="no"
@@ -1489,8 +1503,8 @@ AC_DEFUN([CURL_CHECK_COMPILER_SYMBOL_HIDING], [
     squeeze CFLAGS
     AC_COMPILE_IFELSE([
       AC_LANG_PROGRAM([[
-        $tmp_EXTERN char *dummy(char *buff);
-        char *dummy(char *buff)
+        $tmp_EXTERN const char *dummy(const char *buff);
+        const char *dummy(const char *buff)
         {
           if(buff)
             return ++buff;
@@ -1498,8 +1512,8 @@ AC_DEFUN([CURL_CHECK_COMPILER_SYMBOL_HIDING], [
             return buff;
         }
       ]],[[
-        char b[16];
-        char *r = dummy(&b[0]);
+        const char *b = "example";
+        const char *r = dummy(&b[0]);
         if(r)
           return (int)*r;
       ]])
