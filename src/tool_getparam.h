@@ -263,6 +263,7 @@ typedef enum {
   C_SSL_NO_REVOKE,
   C_SSL_REQD,
   C_SSL_REVOKE_BEST_EFFORT,
+  C_SSL_SESSIONS,
   C_SSLV2,
   C_SSLV3,
   C_STDERR,
@@ -320,6 +321,7 @@ typedef enum {
 #define ARG_TYPEMASK 0x03
 #define ARGTYPE(x) ((x) & ARG_TYPEMASK)
 
+#define ARG_TLS 0x40 /* requires TLS support */
 #define ARG_NO 0x80 /* set if the option is documented as --no-* */
 
 struct LongShort {
@@ -354,6 +356,7 @@ typedef enum {
   PARAM_READ_ERROR,
   PARAM_EXPAND_ERROR, /* --expand problem */
   PARAM_BLANK_STRING,
+  PARAM_VAR_SYNTAX, /* --variable syntax error */
   PARAM_LAST
 } ParameterError;
 
